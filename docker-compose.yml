@@ -1,10 +1,10 @@
 name: rinha-2026-italo-np5
 
-# Variant np5 v2: NPROBE=5 + HAProxy 0.20 / api 0.375 each.
-# Hypothesis: HAProxy 0.15 is the FLOOR (#4218/#4219 with 0.10 regressed badly),
-# but maybe 0.20 wrings out residual queueing at the LB. We lose 0.025 per API
-# replica in exchange.
-# Total budget: haproxy 0.20 + data-prep 0.05 + 2×api 0.375 = 1.00 CPU / 350 MB.
+# Variant np5 v3: NPROBE=5 fast + NPROBE_DEEP=8 adaptive on borderline (nFraud=2|3).
+# Canonical CPU split (haproxy 0.15 / api 0.40 each) isolates the adaptive effect.
+# Hypothesis: 2 FP comes from borderline queries; deep pass at nprobe=8 catches them.
+# Risk: ~5-10% queries do +60% search work; on Mac Mini cpu=0.95 this could push p99.
+# Total budget: haproxy 0.15 + data-prep 0.05 + 2×api 0.40 = 1.00 CPU / 350 MB.
 
 services:
   data-prep:
@@ -18,11 +18,12 @@ services:
           memory: "25MB"
 
   api1:
-    image: italovinicius18/rinha-2026-api:v1
+    image: italovinicius18/rinha-2026-api:v2-adaptive
     environment:
       LISTEN_ADDR: ":8080"
       INDEX_PATH: "/data/index.bin"
       NPROBE: "5"
+      NPROBE_DEEP: "8"
       GOMAXPROCS: "1"
       GOGC: "200"
     volumes:
@@ -34,15 +35,16 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.375"
+          cpus: "0.40"
           memory: "155MB"
 
   api2:
-    image: italovinicius18/rinha-2026-api:v1
+    image: italovinicius18/rinha-2026-api:v2-adaptive
     environment:
       LISTEN_ADDR: ":8080"
       INDEX_PATH: "/data/index.bin"
       NPROBE: "5"
+      NPROBE_DEEP: "8"
       GOMAXPROCS: "1"
       GOGC: "200"
     volumes:
@@ -54,7 +56,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.375"
+          cpus: "0.40"
           memory: "155MB"
 
   haproxy:
@@ -68,7 +70,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.20"
+          cpus: "0.15"
           memory: "15MB"
 
 networks:
