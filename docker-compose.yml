@@ -1,7 +1,10 @@
 name: rinha-2026-italo-np5
 
-# Variant: NPROBE=5 (between 4 and 6). Same CPU split as base submission.
-# Total budget: haproxy 0.15 + data-prep 0.05 + 2×api 0.40 = 1.00 CPU / 350 MB.
+# Variant np5 v2: NPROBE=5 + HAProxy 0.20 / api 0.375 each.
+# Hypothesis: HAProxy 0.15 is the FLOOR (#4218/#4219 with 0.10 regressed badly),
+# but maybe 0.20 wrings out residual queueing at the LB. We lose 0.025 per API
+# replica in exchange.
+# Total budget: haproxy 0.20 + data-prep 0.05 + 2×api 0.375 = 1.00 CPU / 350 MB.
 
 services:
   data-prep:
@@ -31,7 +34,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.40"
+          cpus: "0.375"
           memory: "155MB"
 
   api2:
@@ -51,7 +54,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.40"
+          cpus: "0.375"
           memory: "155MB"
 
   haproxy:
@@ -65,7 +68,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.15"
+          cpus: "0.20"
           memory: "15MB"
 
 networks:
