@@ -1,9 +1,10 @@
 name: rinha-2026-italo-np5
 
-# Variant np5 v3: NPROBE=5 fast + NPROBE_DEEP=8 adaptive on borderline (nFraud=2|3).
-# Canonical CPU split (haproxy 0.15 / api 0.40 each) isolates the adaptive effect.
-# Hypothesis: 2 FP comes from borderline queries; deep pass at nprobe=8 catches them.
-# Risk: ~5-10% queries do +60% search work; on Mac Mini cpu=0.95 this could push p99.
+# Variant np5 v4: UDS (Unix Domain Sockets) HAProxy → API, plain NPROBE=5.
+# Isolates the UDS effect against canonical baseline (+4995 plain or +5071 adaptive).
+# HAProxy connects to /sockets/api{1,2}.sock instead of api{1,2}:8080 TCP loopback.
+# Reduces per-connection syscall overhead by 5-20µs.
+# Image: italovinicius18/rinha-2026-api:v3-uds (supports unix:/path in LISTEN_ADDR).
 # Total budget: haproxy 0.15 + data-prep 0.05 + 2×api 0.40 = 1.00 CPU / 350 MB.
 
 services:
@@ -18,16 +19,16 @@ services:
           memory: "25MB"
 
   api1:
-    image: italovinicius18/rinha-2026-api:v2-adaptive
+    image: italovinicius18/rinha-2026-api:v3-uds
     environment:
-      LISTEN_ADDR: ":8080"
+      LISTEN_ADDR: "unix:/sockets/api1.sock"
       INDEX_PATH: "/data/index.bin"
       NPROBE: "5"
-      NPROBE_DEEP: "8"
       GOMAXPROCS: "1"
       GOGC: "200"
     volumes:
       - index-data:/data:ro
+      - sockets:/sockets
     depends_on:
       data-prep:
         condition: service_completed_successfully
@@ -39,16 +40,16 @@ services:
           memory: "155MB"
 
   api2:
-    image: italovinicius18/rinha-2026-api:v2-adaptive
+    image: italovinicius18/rinha-2026-api:v3-uds
     environment:
-      LISTEN_ADDR: ":8080"
+      LISTEN_ADDR: "unix:/sockets/api2.sock"
       INDEX_PATH: "/data/index.bin"
       NPROBE: "5"
-      NPROBE_DEEP: "8"
       GOMAXPROCS: "1"
       GOGC: "200"
     volumes:
       - index-data:/data:ro
+      - sockets:/sockets
     depends_on:
       data-prep:
         condition: service_completed_successfully
@@ -64,6 +65,7 @@ services:
     depends_on: [api1, api2]
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - sockets:/sockets
     ports:
       - "9999:9999"
     networks: [rinha]
@@ -79,3 +81,4 @@ networks:
 
 volumes:
   index-data:
+  sockets:
