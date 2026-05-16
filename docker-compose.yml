@@ -1,15 +1,17 @@
 name: rinha-2026-italo-np5
 
-# Variant np5 v5: Adaptive NPROBE=4 fast + NPROBE_DEEP=8 on borderline (nFraud∈{2,3}).
-# Local WSL bench (clean rerun) scored +5423.98 with p99 2.20ms, 2 FP + 1 FN — tied
-# with Adaptive 5→8 (+5450.32) within noise. Worth a Mac Mini test to see if the
-# lower fast-pass (4 vs 5) helps under CPU saturation. Reverts UDS+TCP loopback.
-# Image: italovinicius18/rinha-2026-api:v2-adaptive (supports NPROBE_DEEP env).
+# Variant np5 v6: PQ-rerank (PQ filter + F32 rerank), NPROBE=12, RERANK_N=200.
+# Index: ~189MB (FormatIVF_PQ_F32) = 21MB PQ codes + 168MB F32 vecs, MAP_SHARED.
+# PQ filter ranks all candidates by approx distance (M=7 sub-spaces × K=256 codes,
+# 8× less mem bandwidth than F32 scan); F32 rerank confirms top-5 with exact dist.
+# Local WSL: +5690 p99 1.35ms, 0 FP + 1 FN — same accuracy as Adaptive 5→10 baseline.
+# Hypothesis: Mac Mini DDR3 memory bandwidth is the bottleneck; PQ's 8x bandwidth
+# reduction could cut p99 from 5ms → 2-3ms = +200-500 pts.
 # Total budget: haproxy 0.15 + data-prep 0.05 + 2×api 0.40 = 1.00 CPU / 350 MB.
 
 services:
   data-prep:
-    image: italovinicius18/rinha-2026-data-prep:v1
+    image: italovinicius18/rinha-2026-data-prep:v5-pq-rerank
     volumes:
       - index-data:/shared
     deploy:
@@ -19,12 +21,12 @@ services:
           memory: "25MB"
 
   api1:
-    image: italovinicius18/rinha-2026-api:v2-adaptive
+    image: italovinicius18/rinha-2026-api:v5-pq-rerank
     environment:
       LISTEN_ADDR: ":8080"
       INDEX_PATH: "/data/index.bin"
-      NPROBE: "4"
-      NPROBE_DEEP: "8"
+      NPROBE: "12"
+      RERANK_N: "200"
       GOMAXPROCS: "1"
       GOGC: "200"
     volumes:
@@ -40,12 +42,12 @@ services:
           memory: "155MB"
 
   api2:
-    image: italovinicius18/rinha-2026-api:v2-adaptive
+    image: italovinicius18/rinha-2026-api:v5-pq-rerank
     environment:
       LISTEN_ADDR: ":8080"
       INDEX_PATH: "/data/index.bin"
-      NPROBE: "4"
-      NPROBE_DEEP: "8"
+      NPROBE: "12"
+      RERANK_N: "200"
       GOMAXPROCS: "1"
       GOGC: "200"
     volumes:
