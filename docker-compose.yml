@@ -1,17 +1,17 @@
 name: rinha-2026-italo-np5
 
-# Variant np5 v6: PQ-rerank (PQ filter + F32 rerank), NPROBE=12, RERANK_N=200.
-# Index: ~189MB (FormatIVF_PQ_F32) = 21MB PQ codes + 168MB F32 vecs, MAP_SHARED.
-# PQ filter ranks all candidates by approx distance (M=7 sub-spaces × K=256 codes,
-# 8× less mem bandwidth than F32 scan); F32 rerank confirms top-5 with exact dist.
-# Local WSL: +5690 p99 1.35ms, 0 FP + 1 FN — same accuracy as Adaptive 5→10 baseline.
-# Hypothesis: Mac Mini DDR3 memory bandwidth is the bottleneck; PQ's 8x bandwidth
-# reduction could cut p99 from 5ms → 2-3ms = +200-500 pts.
+# Variant np5 v7: C=4096 IVF-F32 + Adaptive NPROBE=12 fast + NPROBE_DEEP=32.
+# 8× more centroids than canonical (4096 vs 512) → each cluster ~733 vecs (vs 5859).
+# Fast pass: 12 × 733 = ~9k vec scan (vs canonical 5 × 5859 = 29k = 3× less work).
+# Deep pass: 32 × 733 = 23k vec scan (vs canonical 10 × 5859 = 59k = 2.5× less work).
+# Local WSL: +5819.38 p99 0.82ms, 0 FP + 1 FN — BEATS canonical (+5792 p99 1.06).
+# Hypothesis on Mac Mini: less CPU/query → less saturation → p99 drops 5.21→2ms-ish.
+# Image: italovinicius18/rinha-2026-data-prep:v6-c4096 (4096-centroid F32 index).
 # Total budget: haproxy 0.15 + data-prep 0.05 + 2×api 0.40 = 1.00 CPU / 350 MB.
 
 services:
   data-prep:
-    image: italovinicius18/rinha-2026-data-prep:v5-pq-rerank
+    image: italovinicius18/rinha-2026-data-prep:v6-c4096
     volumes:
       - index-data:/shared
     deploy:
@@ -21,12 +21,12 @@ services:
           memory: "25MB"
 
   api1:
-    image: italovinicius18/rinha-2026-api:v5-pq-rerank
+    image: italovinicius18/rinha-2026-api:v2-adaptive
     environment:
       LISTEN_ADDR: ":8080"
       INDEX_PATH: "/data/index.bin"
       NPROBE: "12"
-      RERANK_N: "200"
+      NPROBE_DEEP: "32"
       GOMAXPROCS: "1"
       GOGC: "200"
     volumes:
@@ -42,12 +42,12 @@ services:
           memory: "155MB"
 
   api2:
-    image: italovinicius18/rinha-2026-api:v5-pq-rerank
+    image: italovinicius18/rinha-2026-api:v2-adaptive
     environment:
       LISTEN_ADDR: ":8080"
       INDEX_PATH: "/data/index.bin"
       NPROBE: "12"
-      RERANK_N: "200"
+      NPROBE_DEEP: "32"
       GOMAXPROCS: "1"
       GOGC: "200"
     volumes:
