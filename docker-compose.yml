@@ -19,7 +19,7 @@ services:
           memory: "25MB"
 
   api1:
-    image: italovinicius18/rinha-2026-api:v9-prewarm
+    image: italovinicius18/rinha-2026-api:v10-prewarm-async
     environment:
       LISTEN_ADDR: ":8080"
       INDEX_PATH: "/data/index.bin"
@@ -40,7 +40,7 @@ services:
           memory: "155MB"
 
   api2:
-    image: italovinicius18/rinha-2026-api:v9-prewarm
+    image: italovinicius18/rinha-2026-api:v10-prewarm-async
     environment:
       LISTEN_ADDR: ":8080"
       INDEX_PATH: "/data/index.bin"
