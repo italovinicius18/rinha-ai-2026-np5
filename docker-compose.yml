@@ -1,17 +1,15 @@
 name: rinha-2026-italo-np5
 
-# Variant np5 v7: C=4096 IVF-F32 + Adaptive NPROBE=12 fast + NPROBE_DEEP=32.
-# 8× more centroids than canonical (4096 vs 512) → each cluster ~733 vecs (vs 5859).
-# Fast pass: 12 × 733 = ~9k vec scan (vs canonical 5 × 5859 = 29k = 3× less work).
-# Deep pass: 32 × 733 = 23k vec scan (vs canonical 10 × 5859 = 59k = 2.5× less work).
-# Local WSL: +5819.38 p99 0.82ms, 0 FP + 1 FN — BEATS canonical (+5792 p99 1.06).
-# Hypothesis on Mac Mini: less CPU/query → less saturation → p99 drops 5.21→2ms-ish.
-# Image: italovinicius18/rinha-2026-data-prep:v6-c4096 (4096-centroid F32 index).
+# Variant np5 v8: canonical C=512 Adaptive 5→10 + mmap pre-warm (exp29).
+# Pre-warm: madvise WILLNEED + linear page touch before close(ready).
+# Removes cold-page fault jitter from first-N requests.
+# Local WSL 4-way bench: +5670 p99 1.41ms (vs canonical +5619 p99 1.59ms) = +51 / -0.18ms.
+# Same data-prep:v1 (C=512 F32 168 MB index) as canonical.
 # Total budget: haproxy 0.15 + data-prep 0.05 + 2×api 0.40 = 1.00 CPU / 350 MB.
 
 services:
   data-prep:
-    image: italovinicius18/rinha-2026-data-prep:v6-c4096
+    image: italovinicius18/rinha-2026-data-prep:v1
     volumes:
       - index-data:/shared
     deploy:
@@ -21,12 +19,12 @@ services:
           memory: "25MB"
 
   api1:
-    image: italovinicius18/rinha-2026-api:v2-adaptive
+    image: italovinicius18/rinha-2026-api:v9-prewarm
     environment:
       LISTEN_ADDR: ":8080"
       INDEX_PATH: "/data/index.bin"
-      NPROBE: "12"
-      NPROBE_DEEP: "32"
+      NPROBE: "5"
+      NPROBE_DEEP: "10"
       GOMAXPROCS: "1"
       GOGC: "200"
     volumes:
@@ -42,12 +40,12 @@ services:
           memory: "155MB"
 
   api2:
-    image: italovinicius18/rinha-2026-api:v2-adaptive
+    image: italovinicius18/rinha-2026-api:v9-prewarm
     environment:
       LISTEN_ADDR: ":8080"
       INDEX_PATH: "/data/index.bin"
-      NPROBE: "12"
-      NPROBE_DEEP: "32"
+      NPROBE: "5"
+      NPROBE_DEEP: "10"
       GOMAXPROCS: "1"
       GOGC: "200"
     volumes:
